@@ -277,6 +277,7 @@
     //  Auth view
     // ================================================================
     function showAuth() {
+        _boardReady = false;
         document.getElementById('auth-view').classList.remove('hidden');
         document.getElementById('board-view').classList.add('hidden');
     }
@@ -306,8 +307,21 @@
     // ================================================================
     //  Board view
     // ================================================================
+    let _boardReady = false;
     async function showBoard() {
+        if (_boardReady) return;
+        _boardReady = true;
         document.getElementById('auth-view').classList.add('hidden');
+        document.getElementById('board-view').classList.remove('hidden');
+        await loadCategories();
+        if (state.categories.length === 0) {
+            try { await seedDefaultCategories(); } catch {}
+            await loadCategories();
+        }
+        await loadLinks();
+        renderCategories();
+        renderLinks();
+    }
         document.getElementById('board-view').classList.remove('hidden');
         await loadCategories();
         if (state.categories.length === 0) {
@@ -555,9 +569,27 @@
         const btn = document.getElementById('l-save');
         btn.disabled = true;
         btn.textContent = '儲存中…';
-        const { error } = await sb.from('links').insert(row);
-        if (error) {
-            toast('儲存失敗：' + error.message);
+        try {
+            const token = state.session.access_token;
+            const r = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
+                method: 'POST',
+                headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                    Prefer: 'return=minimal',
+                },
+                body: JSON.stringify(row),
+            });
+            if (!r.ok) {
+                const msg = await r.text();
+                toast('儲存失敗：' + msg);
+                btn.disabled = false;
+                btn.textContent = '儲存';
+                return;
+            }
+        } catch (e) {
+            toast('儲存失敗：' + e.message);
             btn.disabled = false;
             btn.textContent = '儲存';
             return;
