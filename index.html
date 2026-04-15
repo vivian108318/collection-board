@@ -560,19 +560,17 @@
             document.getElementById('l-title').value = d.title || '';
             document.getElementById('l-desc').value = d.description || '';
             let thumb = d.image && d.image.url ? d.image.url : '';
-            // 抓不到 og:image（Threads / IG / 任何需要 JS 渲染的頁面）
-            // → 改用 WordPress 的 mShots 去拍頁面截圖當 fallback
             if (!thumb) {
                 thumb = 'https://s.wordpress.com/mshots/v1/' + encodeURIComponent(url) + '?w=1200';
             }
             document.getElementById('l-thumb').value = thumb;
-            img.innerHTML = `<img src="${escapeHtml(thumb)}" class="w-full h-full object-cover" referrerpolicy="no-referrer">`;
+            img.innerHTML = `<img src="${escapeHtml(thumb)}" class="w-full h-full object-cover" referrerpolicy="no-referrer"
+                onerror="this.src='https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200'">`;
         } catch (err) {
             img.innerHTML = '<span class="text-xs text-gray-500 px-4 text-center">抓不到預覽，請手動填標題／描述／縮圖</span>';
         }
         document.getElementById('l-save').classList.remove('hidden');
     }
-
     async function saveNewLink() {
         const url = document.getElementById('l-url').value.trim();
         if (!url) return toast('請輸入網址');
