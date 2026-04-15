@@ -163,12 +163,10 @@
 </head>
 <body>
 
-    <!-- Config warning (shown when Supabase keys are missing) -->
     <div id="config-warning" class="hidden fixed top-0 inset-x-0 bg-amber-100 text-amber-900 text-xs px-4 py-2 text-center z-50 border-b border-amber-200">
-        尚未填入 Supabase 設定 — 請編輯 <code>index.html</code> 最上方的 <code>SUPABASE_URL</code> 與 <code>SUPABASE_ANON_KEY</code>，詳見 <code>SETUP.md</code>
+        尚未填入 Supabase 設定 — 請編輯 <code>index.html</code> 最上方的 <code>SUPABASE_URL</code> 與 <code>SUPABASE_ANON_KEY</code>
     </div>
 
-    <!-- ========== Auth View ========== -->
     <section id="auth-view" class="hidden min-h-screen flex items-center justify-center px-6">
         <div class="max-w-sm w-full">
             <div class="text-center mb-8">
@@ -185,7 +183,6 @@
         </div>
     </section>
 
-    <!-- ========== Board View ========== -->
     <section id="board-view" class="hidden">
         <header class="sticky top-0 bg-[#FAF9F6]/92 backdrop-blur-md z-30 border-b border-[#EAE7E2]">
             <div class="max-w-6xl mx-auto px-5 sm:px-6 pt-4 pb-3 flex items-center justify-between gap-3">
@@ -223,12 +220,11 @@
 
     <script>
     // ================================================================
-    //  Config — 從 Supabase Dashboard → Project Settings → API 複製
+    //  Config — 從 Supabase Dashboard 複製
     // ================================================================
-    const SUPABASE_URL = 'https://iwwqavbnaejdewonejll.supabase.co';       // ← 填你的 Project URL（像 https://xxxxx.supabase.co）
-    const SUPABASE_ANON_KEY = 'sb_publishable_kS0MfJOSI9R5KDdJqN892A_dGqt_H35';  // ← 填你的 anon public key（一長串 jwt）
+    const SUPABASE_URL = 'https://iwwqavbnaejdewonejli.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_kSOMfJOSI9R5KDdJqN892A_dGqt_H3S';
 
-    // 首次登入自動建立的預設分類
     const DEFAULT_CATEGORIES = [
         { name: '生活樂趣', color: '#8E9775', sort_order: 1 },
         { name: '食譜',     color: '#A98467', sort_order: 2 },
@@ -238,16 +234,34 @@
     ];
     const COLOR_PALETTE = ['#8E9775', '#A98467', '#B5838D', '#6D6875', '#C98A6B', '#7A8B99'];
 
-    // ================================================================
-    //  State
-    // ================================================================
     const state = {
         session: null,
         categories: [],
         links: [],
-        filterCategoryId: null,  // null = 全部
+        filterCategoryId: null,
     };
     let sb = null;
+
+    // ================================================================
+    //  Raw-fetch helper — 繞開 supabase-js 在某些情境會卡住的問題
+    // ================================================================
+    async function sbREST(path, opts = {}) {
+        const token = state.session?.access_token;
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+            ...opts,
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: 'Bearer ' + token,
+                'Content-Type': 'application/json',
+                ...(opts.headers || {}),
+            },
+        });
+        const text = await r.text();
+        if (!r.ok) {
+            return { data: null, error: { message: text || r.statusText, status: r.status } };
+        }
+        return { data: text ? JSON.parse(text) : null, error: null };
+    }
 
     // ================================================================
     //  Boot
@@ -322,21 +336,9 @@
         renderCategories();
         renderLinks();
     }
-        document.getElementById('board-view').classList.remove('hidden');
-        await loadCategories();
-        if (state.categories.length === 0) {
-            await seedDefaultCategories();
-            await loadCategories();
-        }
-        await loadLinks();
-        renderCategories();
-        renderLinks();
-    }
 
     async function loadCategories() {
-        const { data, error } = await sb.from('categories')
-            .select('*')
-            .order('sort_order', { ascending: true });
+        const { data, error } = await sbREST('categories?select=*&order=sort_order.asc');
         if (error) { toast('載入分類失敗：' + error.message); return; }
         state.categories = data || [];
     }
@@ -344,19 +346,22 @@
     async function seedDefaultCategories() {
         const uid = state.session.user.id;
         const rows = DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: uid }));
-        const { error } = await sb.from('categories').insert(rows);
-        if (error) toast('建立預設分類失敗：' + error.message);
+        const { error } = await sbREST('categories', {
+            method: 'POST',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify(rows),
+        });
+        if (error && !/duplicate key|unique/i.test(error.message)) {
+            toast('建立預設分類失敗：' + error.message);
+        }
     }
 
     async function loadLinks() {
-        const { data, error } = await sb.from('links')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { data, error } = await sbREST('links?select=*&order=created_at.desc');
         if (error) { toast('載入連結失敗：' + error.message); return; }
         state.links = data || [];
     }
 
-    // ----- Category bar -----
     function renderCategories() {
         const bar = document.getElementById('cat-bar');
         bar.innerHTML = '';
@@ -386,7 +391,6 @@
         return el;
     }
 
-    // ----- Links grid -----
     function renderLinks() {
         const grid = document.getElementById('links-grid');
         const empty = document.getElementById('empty');
@@ -485,7 +489,6 @@
     });
     window.closeModal = closeModal;
 
-    // ----- Add link modal -----
     function openAddLinkModal() {
         const catOptions = state.categories.map(c =>
             `<option value="${c.id}">${escapeHtml(c.name)}</option>`
@@ -569,27 +572,13 @@
         const btn = document.getElementById('l-save');
         btn.disabled = true;
         btn.textContent = '儲存中…';
-        try {
-            const token = state.session.access_token;
-            const r = await fetch(`${SUPABASE_URL}/rest/v1/links`, {
-                method: 'POST',
-                headers: {
-                    apikey: SUPABASE_ANON_KEY,
-                    Authorization: 'Bearer ' + token,
-                    'Content-Type': 'application/json',
-                    Prefer: 'return=minimal',
-                },
-                body: JSON.stringify(row),
-            });
-            if (!r.ok) {
-                const msg = await r.text();
-                toast('儲存失敗：' + msg);
-                btn.disabled = false;
-                btn.textContent = '儲存';
-                return;
-            }
-        } catch (e) {
-            toast('儲存失敗：' + e.message);
+        const { error } = await sbREST('links', {
+            method: 'POST',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify(row),
+        });
+        if (error) {
+            toast('儲存失敗：' + error.message);
             btn.disabled = false;
             btn.textContent = '儲存';
             return;
@@ -600,7 +589,6 @@
         toast('已新增');
     }
 
-    // ----- Add category modal -----
     function openCategoryModal() {
         const swatches = COLOR_PALETTE.map((c, i) =>
             `<button type="button" data-color="${c}" class="color-swatch ${i === 0 ? 'selected' : ''}" style="background:${c}"></button>`
@@ -629,11 +617,15 @@
             const name = document.getElementById('c-name').value.trim();
             if (!name) return toast('請填名稱');
             const maxOrder = state.categories.reduce((m, c) => Math.max(m, c.sort_order || 0), 0);
-            const { error } = await sb.from('categories').insert({
-                user_id: state.session.user.id,
-                name,
-                color: selected,
-                sort_order: maxOrder + 1,
+            const { error } = await sbREST('categories', {
+                method: 'POST',
+                headers: { Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                    user_id: state.session.user.id,
+                    name,
+                    color: selected,
+                    sort_order: maxOrder + 1,
+                }),
             });
             if (error) return toast('失敗：' + error.message);
             closeModal();
@@ -646,7 +638,6 @@
         });
     }
 
-    // ----- Re-categorize modal -----
     function openRecatModal(link) {
         const opts = state.categories.map(c =>
             `<button data-id="${c.id}" class="w-full text-left px-4 py-3 hover:bg-[#F5F3EE] border-b border-[#EFEDE8] last:border-0" style="color:${c.color}">${escapeHtml(c.name)}</button>`
@@ -665,7 +656,11 @@
             b.addEventListener('click', async () => {
                 const raw = b.dataset.id;
                 const catId = raw === '__none__' ? null : raw;
-                const { error } = await sb.from('links').update({ category_id: catId }).eq('id', link.id);
+                const { error } = await sbREST(`links?id=eq.${link.id}`, {
+                    method: 'PATCH',
+                    headers: { Prefer: 'return=minimal' },
+                    body: JSON.stringify({ category_id: catId }),
+                });
                 if (error) return toast('失敗：' + error.message);
                 closeModal();
                 await loadLinks();
@@ -677,7 +672,7 @@
 
     async function deleteLink(link) {
         if (!confirm('確定刪除這個連結嗎？')) return;
-        const { error } = await sb.from('links').delete().eq('id', link.id);
+        const { error } = await sbREST(`links?id=eq.${link.id}`, { method: 'DELETE' });
         if (error) return toast('刪除失敗：' + error.message);
         await loadLinks();
         renderLinks();
