@@ -650,6 +650,66 @@
             if (e.key === 'Enter') document.getElementById('c-save').click();
         });
     }
+    // ----- Edit category modal -----
+    function openEditCategoryModal(cat) {
+        const swatches = COLOR_PALETTE.map(c =>
+            `<button type="button" data-color="${c}" class="color-swatch ${c === cat.color ? 'selected' : ''}" style="background:${c}"></button>`
+        ).join('');
+        mountModal(`
+            <h3 class="font-serif text-lg font-bold mb-4">編輯分類</h3>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">名稱</label>
+            <input id="ec-name" class="input mb-5" value="${escapeHtml(cat.name)}" autofocus>
+            <label class="block text-[11px] text-gray-500 mb-2 tracking-[0.1em] uppercase">顏色</label>
+            <div id="ec-colors" class="flex gap-2 mb-6 flex-wrap">${swatches}</div>
+            <div class="flex justify-between items-center gap-2">
+                <button id="ec-delete" class="btn-ghost text-red-500 hover:bg-red-50">刪除分類</button>
+                <div class="flex gap-2">
+                    <button class="btn-ghost" onclick="closeModal()">取消</button>
+                    <button id="ec-save" class="btn-primary">儲存</button>
+                </div>
+            </div>
+        `);
+        let selected = cat.color;
+        document.querySelectorAll('#ec-colors .color-swatch').forEach((b) => {
+            b.addEventListener('click', () => {
+                selected = b.dataset.color;
+                document.querySelectorAll('#ec-colors .color-swatch')
+                    .forEach(x => x.classList.remove('selected'));
+                b.classList.add('selected');
+            });
+        });
+        document.getElementById('ec-save').addEventListener('click', async () => {
+            const name = document.getElementById('ec-name').value.trim();
+            if (!name) return toast('請填名稱');
+            const { error } = await sbREST(`categories?id=eq.${cat.id}`, {
+                method: 'PATCH',
+                headers: { Prefer: 'return=minimal' },
+                body: JSON.stringify({ name, color: selected }),
+            });
+            if (error) return toast('失敗：' + error.message);
+            closeModal();
+            await loadCategories();
+            await loadLinks();
+            renderCategories();
+            renderLinks();
+            toast('已更新分類');
+        });
+        document.getElementById('ec-delete').addEventListener('click', async () => {
+            if (!confirm(`確定刪除分類「${cat.name}」嗎？\n\n這個分類底下的連結不會被刪除，會變成「未分類」。`)) return;
+            const { error } = await sbREST(`categories?id=eq.${cat.id}`, { method: 'DELETE' });
+            if (error) return toast('刪除失敗：' + error.message);
+            state.filterCategoryId = null;
+            closeModal();
+            await loadCategories();
+            await loadLinks();
+            renderCategories();
+            renderLinks();
+            toast('已刪除分類');
+        });
+        document.getElementById('ec-name').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('ec-save').click();
+        });
+    }
 
     function openRecatModal(link) {
         const opts = state.categories.map(c =>
