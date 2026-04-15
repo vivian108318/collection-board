@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>連結收藏看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #FAF9F6;
+            --color-sage: #8E9775;
+            --color-earth: #A98467;
+            --color-sand: #E2D1C3;
+            --color-text: #4A4A4A;
+            --color-rose: #B5838D;
+            --color-slate: #6D6875;
+        }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+        }
+        h1, h2, h3, .font-serif {
+            font-family: 'Noto Serif TC', serif;
+        }
+        .card-soft {
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #EAE7E2;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .card-link:hover {
+            box-shadow: 0 10px 20px -8px rgba(74, 74, 74, 0.12);
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: var(--color-sage);
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.15s, opacity 0.15s;
+        }
+        .btn-primary:hover { background: #7e8666; }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-ghost {
+            color: var(--color-text);
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: background 0.15s;
+        }
+        .btn-ghost:hover { background: #EFEDE8; }
+        .cat-chip {
+            padding: 0.375rem 0.875rem;
+            border-radius: 999px;
+            font-size: 13px;
+            color: var(--color-text);
+            background: #F1F0EC;
+            border: 1px solid transparent;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .cat-chip:hover { background: #E9E7E1; }
+        .cat-chip.active {
+            background: #ffffff;
+            border-color: currentColor;
+            font-weight: 700;
+        }
+        .input {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1px solid #E5E3DE;
+            border-radius: 8px;
+            background: #ffffff;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+            color: var(--color-text);
+        }
+        .input:focus {
+            border-color: var(--color-sage);
+            box-shadow: 0 0 0 3px rgba(142, 151, 117, 0.15);
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(40, 38, 32, 0.45);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal {
+            background: #ffffff;
+            border-radius: 16px;
+            max-width: 480px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+        .spinner {
+            border: 2px solid #EAE7E2;
+            border-top-color: var(--color-sage);
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2D3748;
+            color: #ffffff;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            max-width: 90vw;
+            text-align: center;
+        }
+        .toast.show { opacity: 1; }
+        .color-swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 2px solid #ffffff;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .color-swatch:hover { transform: scale(1.08); }
+        .color-swatch.selected {
+            box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-sage);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Config warning (shown when Supabase keys are missing) -->
+    <div id="config-warning" class="hidden fixed top-0 inset-x-0 bg-amber-100 text-amber-900 text-xs px-4 py-2 text-center z-50 border-b border-amber-200">
+        尚未填入 Supabase 設定 — 請編輯 <code>index.html</code> 最上方的 <code>SUPABASE_URL</code> 與 <code>SUPABASE_ANON_KEY</code>，詳見 <code>SETUP.md</code>
+    </div>
+
+    <!-- ========== Auth View ========== -->
+    <section id="auth-view" class="hidden min-h-screen flex items-center justify-center px-6">
+        <div class="max-w-sm w-full">
+            <div class="text-center mb-8">
+                <span class="text-xs tracking-[0.25em] text-gray-400 uppercase block mb-3">Link Board</span>
+                <h1 class="text-3xl font-bold mb-3">連結收藏看板</h1>
+                <p class="text-sm text-gray-500 leading-relaxed">把散落在各處收藏的網址，<br>一鍵分類、預覽、隨時找得到。</p>
+            </div>
+            <div class="card-soft p-6">
+                <label class="block text-[11px] text-gray-500 mb-2 tracking-[0.15em] uppercase">Email</label>
+                <input id="auth-email" type="email" class="input mb-4" placeholder="you@example.com" autocomplete="email">
+                <button id="auth-send" class="btn-primary w-full">寄送登入連結</button>
+                <p id="auth-msg" class="text-xs text-gray-500 mt-4 text-center hidden leading-relaxed"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== Board View ========== -->
+    <section id="board-view" class="hidden">
+        <header class="sticky top-0 bg-[#FAF9F6]/92 backdrop-blur-md z-30 border-b border-[#EAE7E2]">
+            <div class="max-w-6xl mx-auto px-5 sm:px-6 pt-4 pb-3 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <span class="text-[10px] tracking-[0.25em] text-gray-400 uppercase block">Link Board</span>
+                    <h1 class="text-xl font-bold truncate">連結收藏看板</h1>
+                </div>
+                <div class="flex items-center gap-1 sm:gap-2">
+                    <button id="btn-add-link" class="btn-primary whitespace-nowrap">＋ 新連結</button>
+                    <div class="relative">
+                        <button id="btn-menu" class="btn-ghost" aria-label="更多">⋯</button>
+                        <div id="menu" class="hidden absolute right-0 top-full mt-1 w-48 card-soft py-1 text-sm overflow-hidden">
+                            <button id="btn-show-id" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">顯示我的 User ID</button>
+                            <button id="btn-signout" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">登出</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="max-w-6xl mx-auto px-5 sm:px-6 pb-3 overflow-x-auto">
+                <div id="cat-bar" class="flex gap-2 whitespace-nowrap"></div>
+            </div>
+        </header>
+
+        <main class="max-w-6xl mx-auto px-5 sm:px-6 py-8">
+            <div id="links-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+            <div id="empty" class="hidden text-center py-24">
+                <div class="text-5xl mb-4 opacity-30">📎</div>
+                <p class="text-gray-400 text-sm">這裡還沒有收藏<br class="sm:hidden">，點右上「＋ 新連結」來加第一筆</p>
+            </div>
+        </main>
+    </section>
+
+    <div id="modals"></div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+    // ================================================================
+    //  Config — 從 Supabase Dashboard → Project Settings → API 複製
+    // ================================================================
+    const SUPABASE_URL = '';       // ← 填你的 Project URL（像 https://xxxxx.supabase.co）
+    const SUPABASE_ANON_KEY = '';  // ← 填你的 anon public key（一長串 jwt）
+
+    // 首次登入自動建立的預設分類
+    const DEFAULT_CATEGORIES = [
+        { name: '生活樂趣', color: '#8E9775', sort_order: 1 },
+        { name: '食譜',     color: '#A98467', sort_order: 2 },
+        { name: '行銷',     color: '#B5838D', sort_order: 3 },
+        { name: 'AI 工具',  color: '#6D6875', sort_order: 4 },
+        { name: '平面設計', color: '#C98A6B', sort_order: 5 },
+    ];
+    const COLOR_PALETTE = ['#8E9775', '#A98467', '#B5838D', '#6D6875', '#C98A6B', '#7A8B99'];
+
+    // ================================================================
+    //  State
+    // ================================================================
+    const state = {
+        session: null,
+        categories: [],
+        links: [],
+        filterCategoryId: null,  // null = 全部
+    };
+    let sb = null;
+
+    // ================================================================
+    //  Boot
+    // ================================================================
+    async function boot() {
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            document.getElementById('config-warning').classList.remove('hidden');
+            document.getElementById('auth-view').classList.remove('hidden');
+            return;
+        }
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data: { session } } = await sb.auth.getSession();
+        state.session = session;
+        if (session) {
+            await showBoard();
+        } else {
+            showAuth();
+        }
+        sb.auth.onAuthStateChange(async (event, newSession) => {
+            state.session = newSession;
+            if (event === 'SIGNED_IN') await showBoard();
+            if (event === 'SIGNED_OUT') showAuth();
+        });
+    }
+
+    // ================================================================
+    //  Auth view
+    // ================================================================
+    function showAuth() {
+        document.getElementById('auth-view').classList.remove('hidden');
+        document.getElementById('board-view').classList.add('hidden');
+    }
+
+    document.getElementById('auth-send').addEventListener('click', async () => {
+        if (!sb) { toast('尚未設定 Supabase'); return; }
+        const email = document.getElementById('auth-email').value.trim();
+        const msg = document.getElementById('auth-msg');
+        if (!email) return toast('請輸入 email');
+        const btn = document.getElementById('auth-send');
+        btn.disabled = true;
+        btn.textContent = '寄送中…';
+        const { error } = await sb.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: location.href },
+        });
+        btn.disabled = false;
+        btn.textContent = '寄送登入連結';
+        if (error) {
+            toast('寄送失敗：' + error.message);
+            return;
+        }
+        msg.textContent = '已寄出登入連結，請到信箱點擊（同一個分頁會自動登入）。';
+        msg.classList.remove('hidden');
+    });
+
+    // ================================================================
+    //  Board view
+    // ================================================================
+    async function showBoard() {
+        document.getElementById('auth-view').classList.add('hidden');
+        document.getElementById('board-view').classList.remove('hidden');
+        await loadCategories();
+        if (state.categories.length === 0) {
+            await seedDefaultCategories();
+            await loadCategories();
+        }
+        await loadLinks();
+        renderCategories();
+        renderLinks();
+    }
+
+    async function loadCategories() {
+        const { data, error } = await sb.from('categories')
+            .select('*')
+            .order('sort_order', { ascending: true });
+        if (error) { toast('載入分類失敗：' + error.message); return; }
+        state.categories = data || [];
+    }
+
+    async function seedDefaultCategories() {
+        const uid = state.session.user.id;
+        const rows = DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: uid }));
+        const { error } = await sb.from('categories').insert(rows);
+        if (error) toast('建立預設分類失敗：' + error.message);
+    }
+
+    async function loadLinks() {
+        const { data, error } = await sb.from('links')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) { toast('載入連結失敗：' + error.message); return; }
+        state.links = data || [];
+    }
+
+    // ----- Category bar -----
+    function renderCategories() {
+        const bar = document.getElementById('cat-bar');
+        bar.innerHTML = '';
+        bar.appendChild(chipEl('全部', null, state.filterCategoryId === null, '#4A4A4A'));
+        for (const cat of state.categories) {
+            bar.appendChild(chipEl(cat.name, cat.id, state.filterCategoryId === cat.id, cat.color));
+        }
+        const addBtn = document.createElement('button');
+        addBtn.className = 'cat-chip text-gray-400';
+        addBtn.style.borderStyle = 'dashed';
+        addBtn.style.borderColor = '#CFC8BC';
+        addBtn.textContent = '＋ 新分類';
+        addBtn.addEventListener('click', openCategoryModal);
+        bar.appendChild(addBtn);
+    }
+
+    function chipEl(name, id, active, color) {
+        const el = document.createElement('button');
+        el.className = 'cat-chip' + (active ? ' active' : '');
+        el.textContent = name;
+        el.style.color = color;
+        el.addEventListener('click', () => {
+            state.filterCategoryId = id;
+            renderCategories();
+            renderLinks();
+        });
+        return el;
+    }
+
+    // ----- Links grid -----
+    function renderLinks() {
+        const grid = document.getElementById('links-grid');
+        const empty = document.getElementById('empty');
+        const visible = state.filterCategoryId
+            ? state.links.filter(l => l.category_id === state.filterCategoryId)
+            : state.links;
+        grid.innerHTML = '';
+        if (visible.length === 0) {
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        for (const link of visible) grid.appendChild(cardEl(link));
+    }
+
+    function cardEl(link) {
+        const cat = state.categories.find(c => c.id === link.category_id);
+        const host = safeHost(link.url);
+        const catColor = cat ? cat.color : '#A98467';
+        const fallbackLetter = escapeHtml((link.title || host || '?').trim()[0] || '?');
+        const el = document.createElement('article');
+        el.className = 'card-soft card-link overflow-hidden flex flex-col';
+
+        const thumbHtml = link.thumbnail_url
+            ? `<img src="${escapeHtml(link.thumbnail_url)}" class="w-full h-full object-cover" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+            : '';
+
+        el.innerHTML = `
+            <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="block">
+                <div class="aspect-[16/9] flex items-center justify-center overflow-hidden" style="background:${hexToSoft(catColor)}">
+                    ${thumbHtml}
+                    <span class="text-4xl font-serif pointer-events-none" style="color:${catColor};${link.thumbnail_url ? 'display:none' : ''}">${fallbackLetter}</span>
+                </div>
+            </a>
+            <div class="p-4 flex flex-col gap-2 flex-1">
+                ${cat ? `<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start font-medium" style="background:${hexToSoft(catColor)};color:${catColor}">${escapeHtml(cat.name)}</span>` : '<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start text-gray-400 bg-gray-100">未分類</span>'}
+                <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="font-medium text-sm leading-snug hover:text-[#7e8666] line-clamp-2">${escapeHtml(link.title || link.url)}</a>
+                ${link.description ? `<p class="text-xs text-gray-500 line-clamp-3 leading-relaxed">${escapeHtml(link.description)}</p>` : ''}
+                <div class="flex items-center justify-between mt-auto pt-2 gap-2">
+                    <div class="flex items-center gap-1.5 text-[11px] text-gray-400 min-w-0 flex-1">
+                        <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32" class="w-3.5 h-3.5 rounded-sm flex-shrink-0" onerror="this.style.display='none'">
+                        <span class="truncate">${escapeHtml(host)}</span>
+                    </div>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="recat">分類</button>
+                        <button class="btn-ghost text-xs text-red-400 hover:text-red-600" style="padding:0.25rem 0.5rem" data-action="delete">刪除</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteLink(link));
+        el.querySelector('[data-action="recat"]').addEventListener('click', () => openRecatModal(link));
+        return el;
+    }
+
+    // ================================================================
+    //  Helpers
+    // ================================================================
+    function safeHost(url) {
+        try { return new URL(url).hostname.replace(/^www\./, ''); }
+        catch { return url || ''; }
+    }
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+    function hexToSoft(hex) {
+        const h = (hex || '#A98467').replace('#','');
+        const r = parseInt(h.slice(0,2),16);
+        const g = parseInt(h.slice(2,4),16);
+        const b = parseInt(h.slice(4,6),16);
+        return `rgba(${r},${g},${b},0.14)`;
+    }
+    function toast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+    }
+
+    // ================================================================
+    //  Modals
+    // ================================================================
+    function closeModal() {
+        document.getElementById('modals').innerHTML = '';
+    }
+    function mountModal(html) {
+        document.getElementById('modals').innerHTML =
+            `<div class="modal-backdrop" id="backdrop"><div class="modal" id="modal-content">${html}</div></div>`;
+        document.getElementById('backdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'backdrop') closeModal();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
+    window.closeModal = closeModal;
+
+    // ----- Add link modal -----
+    function openAddLinkModal() {
+        const catOptions = state.categories.map(c =>
+            `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+        ).join('');
+        mountModal(`
+            <h3 class="font-serif text-lg font-bold mb-4">新增連結</h3>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">網址</label>
+            <div class="flex gap-2 mb-4">
+                <input id="l-url" class="input" placeholder="https://..." autofocus>
+                <button id="l-fetch" class="btn-primary whitespace-nowrap">抓取</button>
+            </div>
+            <div id="l-preview-wrap" class="hidden">
+                <div id="l-preview-img" class="aspect-[16/9] bg-[#F1EFEA] rounded-lg overflow-hidden mb-4 flex items-center justify-center"></div>
+                <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">標題</label>
+                <input id="l-title" class="input mb-3">
+                <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">描述</label>
+                <textarea id="l-desc" class="input mb-3" rows="2" style="resize:vertical"></textarea>
+                <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">縮圖網址</label>
+                <input id="l-thumb" class="input mb-3" placeholder="https://...">
+                <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">分類</label>
+                <select id="l-cat" class="input mb-5">
+                    <option value="">（未分類）</option>
+                    ${catOptions}
+                </select>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button class="btn-ghost" onclick="closeModal()">取消</button>
+                <button id="l-save" class="btn-primary hidden">儲存</button>
+            </div>
+        `);
+        document.getElementById('l-fetch').addEventListener('click', fetchAndPreview);
+        document.getElementById('l-url').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); fetchAndPreview(); }
+        });
+        document.getElementById('l-save').addEventListener('click', saveNewLink);
+    }
+
+    async function fetchAndPreview() {
+        const url = document.getElementById('l-url').value.trim();
+        if (!url) return toast('請先貼上網址');
+        const wrap = document.getElementById('l-preview-wrap');
+        const img = document.getElementById('l-preview-img');
+        wrap.classList.remove('hidden');
+        img.innerHTML = '<div class="spinner"></div>';
+        document.getElementById('l-title').value = '';
+        document.getElementById('l-desc').value = '';
+        document.getElementById('l-thumb').value = '';
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 9000);
+            const r = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url), { signal: ctrl.signal });
+            clearTimeout(timer);
+            const j = await r.json();
+            if (j.status !== 'success') throw new Error(j.message || 'microlink error');
+            const d = j.data || {};
+            document.getElementById('l-title').value = d.title || '';
+            document.getElementById('l-desc').value = d.description || '';
+            const thumb = d.image && d.image.url ? d.image.url : '';
+            document.getElementById('l-thumb').value = thumb;
+            img.innerHTML = thumb
+                ? `<img src="${escapeHtml(thumb)}" class="w-full h-full object-cover" referrerpolicy="no-referrer">`
+                : '<span class="text-3xl opacity-40">📎</span>';
+        } catch (err) {
+            img.innerHTML = '<span class="text-xs text-gray-500 px-4 text-center">抓不到預覽，請手動填標題／描述／縮圖</span>';
+        }
+        document.getElementById('l-save').classList.remove('hidden');
+    }
+
+    async function saveNewLink() {
+        const url = document.getElementById('l-url').value.trim();
+        if (!url) return toast('請輸入網址');
+        const row = {
+            user_id: state.session.user.id,
+            url,
+            title: document.getElementById('l-title').value.trim() || null,
+            description: document.getElementById('l-desc').value.trim() || null,
+            thumbnail_url: document.getElementById('l-thumb').value.trim() || null,
+            category_id: document.getElementById('l-cat').value || null,
+            site_name: safeHost(url),
+        };
+        const btn = document.getElementById('l-save');
+        btn.disabled = true;
+        btn.textContent = '儲存中…';
+        const { error } = await sb.from('links').insert(row);
+        if (error) {
+            toast('儲存失敗：' + error.message);
+            btn.disabled = false;
+            btn.textContent = '儲存';
+            return;
+        }
+        closeModal();
+        await loadLinks();
+        renderLinks();
+        toast('已新增');
+    }
+
+    // ----- Add category modal -----
+    function openCategoryModal() {
+        const swatches = COLOR_PALETTE.map((c, i) =>
+            `<button type="button" data-color="${c}" class="color-swatch ${i === 0 ? 'selected' : ''}" style="background:${c}"></button>`
+        ).join('');
+        mountModal(`
+            <h3 class="font-serif text-lg font-bold mb-4">新增分類</h3>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">名稱</label>
+            <input id="c-name" class="input mb-5" placeholder="例如：攝影靈感" autofocus>
+            <label class="block text-[11px] text-gray-500 mb-2 tracking-[0.1em] uppercase">顏色</label>
+            <div id="c-colors" class="flex gap-2 mb-6 flex-wrap">${swatches}</div>
+            <div class="flex justify-end gap-2">
+                <button class="btn-ghost" onclick="closeModal()">取消</button>
+                <button id="c-save" class="btn-primary">新增</button>
+            </div>
+        `);
+        let selected = COLOR_PALETTE[0];
+        document.querySelectorAll('#c-colors .color-swatch').forEach((b) => {
+            b.addEventListener('click', () => {
+                selected = b.dataset.color;
+                document.querySelectorAll('#c-colors .color-swatch')
+                    .forEach(x => x.classList.remove('selected'));
+                b.classList.add('selected');
+            });
+        });
+        document.getElementById('c-save').addEventListener('click', async () => {
+            const name = document.getElementById('c-name').value.trim();
+            if (!name) return toast('請填名稱');
+            const maxOrder = state.categories.reduce((m, c) => Math.max(m, c.sort_order || 0), 0);
+            const { error } = await sb.from('categories').insert({
+                user_id: state.session.user.id,
+                name,
+                color: selected,
+                sort_order: maxOrder + 1,
+            });
+            if (error) return toast('失敗：' + error.message);
+            closeModal();
+            await loadCategories();
+            renderCategories();
+            toast('已新增分類');
+        });
+        document.getElementById('c-name').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('c-save').click();
+        });
+    }
+
+    // ----- Re-categorize modal -----
+    function openRecatModal(link) {
+        const opts = state.categories.map(c =>
+            `<button data-id="${c.id}" class="w-full text-left px-4 py-3 hover:bg-[#F5F3EE] border-b border-[#EFEDE8] last:border-0" style="color:${c.color}">${escapeHtml(c.name)}</button>`
+        ).join('');
+        mountModal(`
+            <h3 class="font-serif text-lg font-bold mb-4">移到分類</h3>
+            <div class="border border-[#EFEDE8] rounded-lg overflow-hidden mb-4">
+                <button data-id="__none__" class="w-full text-left px-4 py-3 hover:bg-[#F5F3EE] border-b border-[#EFEDE8] text-gray-500">（未分類）</button>
+                ${opts}
+            </div>
+            <div class="flex justify-end">
+                <button class="btn-ghost" onclick="closeModal()">取消</button>
+            </div>
+        `);
+        document.querySelectorAll('#modal-content [data-id]').forEach((b) => {
+            b.addEventListener('click', async () => {
+                const raw = b.dataset.id;
+                const catId = raw === '__none__' ? null : raw;
+                const { error } = await sb.from('links').update({ category_id: catId }).eq('id', link.id);
+                if (error) return toast('失敗：' + error.message);
+                closeModal();
+                await loadLinks();
+                renderLinks();
+                toast('已更新');
+            });
+        });
+    }
+
+    async function deleteLink(link) {
+        if (!confirm('確定刪除這個連結嗎？')) return;
+        const { error } = await sb.from('links').delete().eq('id', link.id);
+        if (error) return toast('刪除失敗：' + error.message);
+        await loadLinks();
+        renderLinks();
+        toast('已刪除');
+    }
+
+    // ================================================================
+    //  Top-right buttons
+    // ================================================================
+    document.getElementById('btn-add-link').addEventListener('click', openAddLinkModal);
+    document.getElementById('btn-menu').addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('menu').classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => {
+        document.getElementById('menu').classList.add('hidden');
+    });
+    document.getElementById('btn-signout').addEventListener('click', async () => {
+        await sb.auth.signOut();
+    });
+    document.getElementById('btn-show-id').addEventListener('click', async () => {
+        const id = state.session && state.session.user ? state.session.user.id : null;
+        if (!id) return;
+        try {
+            await navigator.clipboard.writeText(id);
+            toast('已複製 User ID：' + id);
+        } catch {
+            prompt('你的 User ID（設定 iOS 捷徑時會用到）：', id);
+        }
+    });
+
+    boot();
+    </script>
+</body>
+</html>
