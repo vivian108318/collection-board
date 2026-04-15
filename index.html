@@ -376,6 +376,19 @@
         addBtn.textContent = '＋ 新分類';
         addBtn.addEventListener('click', openCategoryModal);
         bar.appendChild(addBtn);
+
+        // 選了某個分類時，末端顯示編輯按鈕
+        const activeCat = state.categories.find(c => c.id === state.filterCategoryId);
+        if (activeCat) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'cat-chip';
+            editBtn.style.color = activeCat.color;
+            editBtn.style.borderStyle = 'solid';
+            editBtn.style.borderColor = activeCat.color + '66';
+            editBtn.innerHTML = '✎ 編輯「' + escapeHtml(activeCat.name) + '」';
+            editBtn.addEventListener('click', () => openEditCategoryModal(activeCat));
+            bar.appendChild(editBtn);
+        }
     }
 
     function chipEl(name, id, active, color) {
