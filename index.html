@@ -109,7 +109,7 @@
             border: 1px solid #E5E3DE;
             border-radius: 8px;
             background: #ffffff;
-            font-size: 14px;
+            font-size: 16px;
             outline: none;
             font-family: inherit;
             color: var(--color-text);
@@ -780,7 +780,7 @@
         document.getElementById('l-cancel').addEventListener('click', closeModal);
         document.getElementById('l-fetch').addEventListener('click', fetchAndPreview);
         document.getElementById('l-url').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); fetchAndPreview(); }
+            if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); fetchAndPreview(); }
         });
         document.getElementById('l-save').addEventListener('click', saveNewLink);
     }
@@ -903,7 +903,7 @@
             toast('已新增分類');
         });
         document.getElementById('c-name').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') document.getElementById('c-save').click();
+            if (e.key === 'Enter' && !e.isComposing) document.getElementById('c-save').click();
         });
     }
     // ----- Edit category modal -----
@@ -962,7 +962,7 @@
             toast('已刪除分類');
         });
         document.getElementById('ec-name').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') document.getElementById('ec-save').click();
+            if (e.key === 'Enter' && !e.isComposing) document.getElementById('ec-save').click();
         });
     }
 
@@ -1087,10 +1087,21 @@
     //  Search handler
     // ================================================================
     let _searchTimer;
+    let _isComposing = false;
     const searchInput = document.getElementById('search-input');
     const searchClear = document.getElementById('search-clear');
+    searchInput.addEventListener('compositionstart', () => { _isComposing = true; });
+    searchInput.addEventListener('compositionend', () => {
+        _isComposing = false;
+        clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(() => {
+            state.searchQuery = searchInput.value.trim();
+            resetAndLoadLinks();
+        }, 300);
+    });
     searchInput.addEventListener('input', () => {
         searchClear.classList.toggle('hidden', !searchInput.value);
+        if (_isComposing) return;
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => {
             state.searchQuery = searchInput.value.trim();
