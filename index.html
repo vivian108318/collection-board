@@ -21,7 +21,33 @@
             --color-text: #4A4A4A;
             --color-rose: #B5838D;
             --color-slate: #6D6875;
+            --color-card: #ffffff;
+            --color-border: #EAE7E2;
+            --color-hover: #EFEDE8;
+            --color-chip-bg: #F1F0EC;
+            --color-input-border: #E5E3DE;
+            --color-header-bg: rgba(250, 249, 246, 0.92);
         }
+        html.dark {
+            --color-bg: #1a1a1e;
+            --color-text: #d4d4d4;
+            --color-card: #25252b;
+            --color-border: #35353d;
+            --color-hover: #30303a;
+            --color-chip-bg: #2a2a32;
+            --color-input-border: #3a3a44;
+            --color-header-bg: rgba(26, 26, 30, 0.92);
+        }
+        html.dark .card-soft { background: var(--color-card); border-color: var(--color-border); }
+        html.dark .card-link:hover { box-shadow: 0 10px 20px -8px rgba(0,0,0,0.4); }
+        html.dark .btn-ghost:hover { background: var(--color-hover); }
+        html.dark .cat-chip { background: var(--color-chip-bg); }
+        html.dark .cat-chip:hover { background: var(--color-hover); }
+        html.dark .cat-chip.active { background: var(--color-card); }
+        html.dark .input { background: var(--color-card); border-color: var(--color-input-border); color: var(--color-text); }
+        html.dark .modal { background: var(--color-card); }
+        html.dark .toast { background: #e2e2e2; color: #1a1a1e; }
+        html.dark .color-swatch { border-color: var(--color-card); }
         body {
             font-family: 'Noto Sans TC', sans-serif;
             background-color: var(--color-bg);
@@ -31,9 +57,9 @@
             font-family: 'Noto Serif TC', serif;
         }
         .card-soft {
-            background: #ffffff;
+            background: var(--color-card);
             border-radius: 12px;
-            border: 1px solid #EAE7E2;
+            border: 1px solid var(--color-border);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
             transition: box-shadow 0.2s, transform 0.2s;
         }
@@ -203,7 +229,7 @@
     </section>
 
     <section id="board-view" class="hidden">
-        <header class="sticky top-0 bg-[#FAF9F6]/92 backdrop-blur-md z-30 border-b border-[#EAE7E2]">
+        <header class="sticky top-0 backdrop-blur-md z-30 border-b" style="background-color:var(--color-header-bg);border-color:var(--color-border)">
             <div class="max-w-6xl mx-auto px-5 sm:px-6 pt-4 pb-3 flex items-center justify-between gap-3">
                 <div class="min-w-0">
                     <span class="text-[10px] tracking-[0.25em] text-gray-400 uppercase block">Link Board</span>
@@ -214,8 +240,9 @@
                     <div class="relative">
                         <button id="btn-menu" class="btn-ghost" aria-label="更多選項">⋯</button>
                         <div id="menu" class="hidden absolute right-0 top-full mt-1 w-48 card-soft py-1 text-sm overflow-hidden">
-                            <button id="btn-show-id" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">顯示我的 User ID</button>
-                            <button id="btn-signout" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">登出</button>
+                            <button id="btn-darkmode" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">深色模式</button>
+                            <button id="btn-show-id" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">顯示我的 User ID</button>
+                            <button id="btn-signout" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">登出</button>
                         </div>
                     </div>
                 </div>
@@ -225,7 +252,8 @@
                 <div class="flex items-center gap-2">
                     <div class="relative flex-1">
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg>
-                        <input id="search-input" class="input pl-9" placeholder="搜尋標題或描述…" aria-label="搜尋連結">
+                        <input id="search-input" class="input pl-9 pr-8" placeholder="搜尋標題或描述…" aria-label="搜尋連結">
+                        <button id="search-clear" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden" aria-label="清除搜尋" style="font-size:16px;line-height:1;padding:2px">✕</button>
                     </div>
                     <div class="relative">
                         <button id="btn-sort" class="btn-ghost text-sm whitespace-nowrap flex items-center gap-1" aria-label="排序方式">
@@ -233,10 +261,10 @@
                             <svg class="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="currentColor"><path d="M3 5l3 3 3-3"/></svg>
                         </button>
                         <div id="sort-menu" class="hidden absolute right-0 top-full mt-1 w-40 card-soft py-1 text-sm z-40">
-                            <button data-sort="newest" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE] font-semibold">最新加入</button>
-                            <button data-sort="oldest" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">最早加入</button>
-                            <button data-sort="title" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">標題 A→Z</button>
-                            <button data-sort="site" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">依網站分組</button>
+                            <button data-sort="newest" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)] font-semibold">最新加入</button>
+                            <button data-sort="oldest" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">最早加入</button>
+                            <button data-sort="title" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">標題 A→Z</button>
+                            <button data-sort="site" class="w-full text-left px-4 py-2 hover:bg-[var(--color-hover,#F5F3EE)]">依網站分組</button>
                         </div>
                     </div>
                 </div>
@@ -290,10 +318,11 @@
         links: [],
         filterCategoryId: null,
         searchQuery: '',
-        sortKey: 'newest',
+        sortKey: localStorage.getItem('linkboard_sort') || 'newest',
         pageOffset: 0,
         hasMore: true,
         loading: false,
+        categoryCounts: {},
     };
     let sb = null;
     let _modalCloseCallback = null;
@@ -388,7 +417,7 @@
         document.getElementById('empty').classList.add('hidden');
 
         // Load in parallel
-        await Promise.all([loadCategories(), loadLinks()]);
+        await Promise.all([loadCategories(), loadLinks(), loadCategoryCounts()]);
 
         if (state.categories.length === 0) {
             try { await seedDefaultCategories(); } catch {}
@@ -415,6 +444,13 @@
         if (error && !/duplicate key|unique/i.test(error.message)) {
             toast('建立預設分類失敗：' + error.message);
         }
+    }
+
+    async function loadCategoryCounts() {
+        const { data } = await sbREST('links?select=category_id&limit=10000');
+        const counts = {};
+        if (data) for (const r of data) { const k = r.category_id || '__none__'; counts[k] = (counts[k] || 0) + 1; }
+        state.categoryCounts = counts;
     }
 
     async function loadLinks(append = false) {
@@ -459,6 +495,7 @@
         state.links = [];
         state.pageOffset = 0;
         state.hasMore = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         document.getElementById('links-grid').innerHTML = '';
         document.getElementById('empty').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
@@ -471,7 +508,8 @@
         state.links = [];
         state.pageOffset = 0;
         state.hasMore = true;
-        await loadLinks();
+        await Promise.all([loadLinks(), loadCategoryCounts()]);
+        renderCategories();
         renderLinks();
     }
 
@@ -489,10 +527,12 @@
 
     function renderCategories() {
         const bar = document.getElementById('cat-bar');
+        const counts = state.categoryCounts;
+        const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
         bar.innerHTML = '';
-        bar.appendChild(chipEl('全部', null, state.filterCategoryId === null, '#4A4A4A'));
+        bar.appendChild(chipEl('全部', null, state.filterCategoryId === null, '#4A4A4A', totalCount));
         for (const cat of state.categories) {
-            bar.appendChild(chipEl(cat.name, cat.id, state.filterCategoryId === cat.id, cat.color));
+            bar.appendChild(chipEl(cat.name, cat.id, state.filterCategoryId === cat.id, cat.color, counts[cat.id] || 0));
         }
         const addBtn = document.createElement('button');
         addBtn.className = 'cat-chip text-gray-400';
@@ -516,10 +556,10 @@
         }
     }
 
-    function chipEl(name, id, active, color) {
+    function chipEl(name, id, active, color, count) {
         const el = document.createElement('button');
         el.className = 'cat-chip' + (active ? ' active' : '');
-        el.textContent = name;
+        el.textContent = name + (count != null ? ' (' + count + ')' : '');
         el.style.color = color;
         el.addEventListener('click', () => {
             state.filterCategoryId = id;
@@ -537,6 +577,15 @@
 
         if (state.links.length === 0 && !state.loading) {
             grid.innerHTML = '';
+            const emptyIcon = empty.querySelector('.text-5xl');
+            const emptyText = empty.querySelector('p');
+            if (state.searchQuery) {
+                emptyIcon.textContent = '🔍';
+                emptyText.innerHTML = '找不到符合「' + escapeHtml(state.searchQuery) + '」的連結';
+            } else {
+                emptyIcon.textContent = '📎';
+                emptyText.innerHTML = '這裡還沒有收藏<br class="sm:hidden">，點右上「＋ 新連結」來加第一筆';
+            }
             empty.classList.remove('hidden');
             document.getElementById('loading-more').classList.add('hidden');
             return;
@@ -584,7 +633,8 @@
                         <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32" class="w-3.5 h-3.5 rounded-sm flex-shrink-0" onerror="this.style.display='none'">
                         <span class="truncate">${time ? escapeHtml(time) + ' · ' : ''}${escapeHtml(host)}</span>
                     </div>
-                    <div class="flex items-center gap-1 flex-shrink-0">
+                    <div class="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+                        <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="copy">複製</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="pin">${link.pinned ? '取消釘選' : '釘選'}</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="edit">編輯</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="recat">分類</button>
@@ -593,6 +643,10 @@
                 </div>
             </div>
         `;
+        el.querySelector('[data-action="copy"]').addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText(link.url); toast('已複製網址'); }
+            catch { toast(link.url); }
+        });
         el.querySelector('[data-action="pin"]').addEventListener('click', () => togglePin(link));
         el.querySelector('[data-action="edit"]').addEventListener('click', () => openEditLinkModal(link));
         el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteLink(link));
@@ -914,12 +968,12 @@
 
     function openRecatModal(link) {
         const opts = state.categories.map(c =>
-            `<button data-id="${c.id}" class="w-full text-left px-4 py-3 hover:bg-[#F5F3EE] border-b border-[#EFEDE8] last:border-0" style="color:${c.color}">${escapeHtml(c.name)}</button>`
+            `<button data-id="${c.id}" class="w-full text-left px-4 py-3 hover:bg-[var(--color-hover,#F5F3EE)] border-b border-[#EFEDE8] last:border-0" style="color:${c.color}">${escapeHtml(c.name)}</button>`
         ).join('');
         mountModal(`
             <h3 class="font-serif text-lg font-bold mb-4">移到分類</h3>
             <div class="border border-[#EFEDE8] rounded-lg overflow-hidden mb-4">
-                <button data-id="__none__" class="w-full text-left px-4 py-3 hover:bg-[#F5F3EE] border-b border-[#EFEDE8] text-gray-500">（未分類）</button>
+                <button data-id="__none__" class="w-full text-left px-4 py-3 hover:bg-[var(--color-hover,#F5F3EE)] border-b border-[#EFEDE8] text-gray-500">（未分類）</button>
                 ${opts}
             </div>
             <div class="flex justify-end">
@@ -1033,17 +1087,35 @@
     //  Search handler
     // ================================================================
     let _searchTimer;
-    document.getElementById('search-input').addEventListener('input', () => {
+    const searchInput = document.getElementById('search-input');
+    const searchClear = document.getElementById('search-clear');
+    searchInput.addEventListener('input', () => {
+        searchClear.classList.toggle('hidden', !searchInput.value);
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => {
-            state.searchQuery = document.getElementById('search-input').value.trim();
+            state.searchQuery = searchInput.value.trim();
             resetAndLoadLinks();
         }, 300);
+    });
+    searchClear.addEventListener('click', () => {
+        searchInput.value = '';
+        searchClear.classList.add('hidden');
+        if (state.searchQuery) {
+            state.searchQuery = '';
+            resetAndLoadLinks();
+        }
+        searchInput.focus();
     });
 
     // ================================================================
     //  Sort handler
     // ================================================================
+    // Init sort label from saved preference
+    document.getElementById('sort-label').textContent = SORT_LABELS[state.sortKey] || '最新加入';
+    document.querySelectorAll('#sort-menu [data-sort]').forEach(b => {
+        b.classList.toggle('font-semibold', b.dataset.sort === state.sortKey);
+    });
+
     document.getElementById('btn-sort').addEventListener('click', (e) => {
         e.stopPropagation();
         document.getElementById('sort-menu').classList.toggle('hidden');
@@ -1051,6 +1123,7 @@
     document.querySelectorAll('#sort-menu [data-sort]').forEach(btn => {
         btn.addEventListener('click', () => {
             state.sortKey = btn.dataset.sort;
+            localStorage.setItem('linkboard_sort', state.sortKey);
             document.getElementById('sort-label').textContent = SORT_LABELS[state.sortKey];
             document.getElementById('sort-menu').classList.add('hidden');
             document.querySelectorAll('#sort-menu [data-sort]').forEach(b => {
@@ -1087,6 +1160,18 @@
         document.getElementById('menu').classList.add('hidden');
         document.getElementById('sort-menu').classList.add('hidden');
     });
+    // Dark mode
+    function applyDarkMode(dark) {
+        document.documentElement.classList.toggle('dark', dark);
+        document.getElementById('btn-darkmode').textContent = dark ? '淺色模式' : '深色模式';
+    }
+    applyDarkMode(localStorage.getItem('linkboard_dark') === '1');
+    document.getElementById('btn-darkmode').addEventListener('click', () => {
+        const isDark = !document.documentElement.classList.contains('dark');
+        localStorage.setItem('linkboard_dark', isDark ? '1' : '0');
+        applyDarkMode(isDark);
+    });
+
     document.getElementById('btn-signout').addEventListener('click', async () => {
         await sb.auth.signOut();
     });
