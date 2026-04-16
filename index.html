@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>連結收藏看板</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v26.5a1 1 0 0 1-1.45.9L16 26l-7.55 4.4A1 1 0 0 1 7 29.5V3z' fill='%238E9775'/%3E%3Cpath d='M12 9h8M12 14h5' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://iwwqavbnaejdewonejll.supabase.co">
@@ -209,9 +210,9 @@
                     <h1 class="text-xl font-bold truncate">連結收藏看板</h1>
                 </div>
                 <div class="flex items-center gap-1 sm:gap-2">
-                    <button id="btn-add-link" class="btn-primary whitespace-nowrap">＋ 新連結</button>
+                    <button id="btn-add-link" class="btn-primary whitespace-nowrap" aria-label="新增連結">＋ 新連結</button>
                     <div class="relative">
-                        <button id="btn-menu" class="btn-ghost" aria-label="更多">⋯</button>
+                        <button id="btn-menu" class="btn-ghost" aria-label="更多選項">⋯</button>
                         <div id="menu" class="hidden absolute right-0 top-full mt-1 w-48 card-soft py-1 text-sm overflow-hidden">
                             <button id="btn-show-id" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">顯示我的 User ID</button>
                             <button id="btn-signout" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">登出</button>
@@ -219,13 +220,42 @@
                     </div>
                 </div>
             </div>
+            <!-- Search + Sort -->
+            <div class="max-w-6xl mx-auto px-5 sm:px-6 pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke-linecap="round"/></svg>
+                        <input id="search-input" class="input pl-9" placeholder="搜尋標題或描述…" aria-label="搜尋連結">
+                    </div>
+                    <div class="relative">
+                        <button id="btn-sort" class="btn-ghost text-sm whitespace-nowrap flex items-center gap-1" aria-label="排序方式">
+                            <span id="sort-label">最新加入</span>
+                            <svg class="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="currentColor"><path d="M3 5l3 3 3-3"/></svg>
+                        </button>
+                        <div id="sort-menu" class="hidden absolute right-0 top-full mt-1 w-40 card-soft py-1 text-sm z-40">
+                            <button data-sort="newest" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE] font-semibold">最新加入</button>
+                            <button data-sort="oldest" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">最早加入</button>
+                            <button data-sort="title" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">標題 A→Z</button>
+                            <button data-sort="site" class="w-full text-left px-4 py-2 hover:bg-[#F5F3EE]">依網站分組</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Category chips -->
             <div class="max-w-6xl mx-auto px-5 sm:px-6 pb-3 overflow-x-auto">
                 <div id="cat-bar" class="flex gap-2 whitespace-nowrap"></div>
             </div>
         </header>
 
         <main class="max-w-6xl mx-auto px-5 sm:px-6 py-8">
+            <div id="loading" class="text-center py-16">
+                <div class="spinner mx-auto mb-3"></div>
+                <p class="text-sm text-gray-400">載入中…</p>
+            </div>
             <div id="links-grid" class="masonry"></div>
+            <div id="loading-more" class="hidden text-center py-6">
+                <div class="spinner mx-auto"></div>
+            </div>
             <div id="empty" class="hidden text-center py-24">
                 <div class="text-5xl mb-4 opacity-30">📎</div>
                 <p class="text-gray-400 text-sm">這裡還沒有收藏<br class="sm:hidden">，點右上「＋ 新連結」來加第一筆</p>
@@ -251,14 +281,22 @@
         { name: '平面設計', color: '#C98A6B', sort_order: 5 },
     ];
     const COLOR_PALETTE = ['#8E9775', '#A98467', '#B5838D', '#6D6875', '#C98A6B', '#7A8B99'];
+    const SORT_LABELS = { newest: '最新加入', oldest: '最早加入', title: '標題 A→Z', site: '依網站分組' };
+    const PAGE_SIZE = 20;
 
     const state = {
         session: null,
         categories: [],
         links: [],
         filterCategoryId: null,
+        searchQuery: '',
+        sortKey: 'newest',
+        pageOffset: 0,
+        hasMore: true,
+        loading: false,
     };
     let sb = null;
+    let _modalCloseCallback = null;
 
     // ================================================================
     //  Raw-fetch helper — 繞開 supabase-js 在某些情境會卡住的問題
@@ -345,12 +383,17 @@
         _boardReady = true;
         document.getElementById('auth-view').classList.add('hidden');
         document.getElementById('board-view').classList.remove('hidden');
-        await loadCategories();
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('links-grid').innerHTML = '';
+        document.getElementById('empty').classList.add('hidden');
+
+        // Load in parallel
+        await Promise.all([loadCategories(), loadLinks()]);
+
         if (state.categories.length === 0) {
             try { await seedDefaultCategories(); } catch {}
             await loadCategories();
         }
-        await loadLinks();
         renderCategories();
         renderLinks();
     }
@@ -374,10 +417,74 @@
         }
     }
 
-    async function loadLinks() {
-        const { data, error } = await sbREST('links?select=*&order=created_at.desc');
-        if (error) { toast('載入連結失敗：' + error.message); return; }
-        state.links = data || [];
+    async function loadLinks(append = false) {
+        if (state.loading) return;
+        state.loading = true;
+        if (!append) state.pageOffset = 0;
+
+        let path = `links?select=*&limit=${PAGE_SIZE}&offset=${state.pageOffset}`;
+
+        // Sort — pinned always first
+        let order = 'pinned.desc';
+        switch (state.sortKey) {
+            case 'newest': order += ',created_at.desc'; break;
+            case 'oldest': order += ',created_at.asc'; break;
+            case 'title':  order += ',title.asc'; break;
+            case 'site':   order += ',site_name.asc,created_at.desc'; break;
+        }
+        path += '&order=' + order;
+
+        // Category filter
+        if (state.filterCategoryId) {
+            path += '&category_id=eq.' + state.filterCategoryId;
+        }
+
+        // Search
+        if (state.searchQuery) {
+            const q = state.searchQuery.replace(/[%_*,().]/g, '');
+            if (q) path += `&or=(title.ilike.*${encodeURIComponent(q)}*,description.ilike.*${encodeURIComponent(q)}*)`;
+        }
+
+        const { data, error } = await sbREST(path);
+        if (error) { toast('載入連結失敗：' + error.message); state.loading = false; return; }
+
+        const newLinks = data || [];
+        state.links = append ? state.links.concat(newLinks) : newLinks;
+        state.pageOffset = state.links.length;
+        state.hasMore = newLinks.length >= PAGE_SIZE;
+        state.loading = false;
+    }
+
+    async function resetAndLoadLinks() {
+        state.links = [];
+        state.pageOffset = 0;
+        state.hasMore = true;
+        document.getElementById('links-grid').innerHTML = '';
+        document.getElementById('empty').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('loading-more').classList.add('hidden');
+        await loadLinks();
+        renderLinks();
+    }
+
+    async function refreshLinks() {
+        state.links = [];
+        state.pageOffset = 0;
+        state.hasMore = true;
+        await loadLinks();
+        renderLinks();
+    }
+
+    async function loadMoreLinks() {
+        if (state.loading || !state.hasMore) return;
+        document.getElementById('loading-more').classList.remove('hidden');
+        await loadLinks(true);
+        const grid = document.getElementById('links-grid');
+        const rendered = grid.children.length;
+        for (let i = rendered; i < state.links.length; i++) {
+            grid.appendChild(cardEl(state.links[i]));
+        }
+        document.getElementById('loading-more').classList.toggle('hidden', !state.hasMore);
     }
 
     function renderCategories() {
@@ -417,7 +524,7 @@
         el.addEventListener('click', () => {
             state.filterCategoryId = id;
             renderCategories();
-            renderLinks();
+            resetAndLoadLinks();
         });
         return el;
     }
@@ -425,16 +532,19 @@
     function renderLinks() {
         const grid = document.getElementById('links-grid');
         const empty = document.getElementById('empty');
-        const visible = state.filterCategoryId
-            ? state.links.filter(l => l.category_id === state.filterCategoryId)
-            : state.links;
-        grid.innerHTML = '';
-        if (visible.length === 0) {
+
+        document.getElementById('loading').classList.add('hidden');
+
+        if (state.links.length === 0 && !state.loading) {
+            grid.innerHTML = '';
             empty.classList.remove('hidden');
+            document.getElementById('loading-more').classList.add('hidden');
             return;
         }
         empty.classList.add('hidden');
-        for (const link of visible) grid.appendChild(cardEl(link));
+        grid.innerHTML = '';
+        for (const link of state.links) grid.appendChild(cardEl(link));
+        document.getElementById('loading-more').classList.toggle('hidden', !state.hasMore);
     }
 
     function cardEl(link) {
@@ -450,18 +560,32 @@
                </a>`
             : '';
 
+        const catTag = cat
+            ? `<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start font-medium" style="background:${hexToSoft(catColor)};color:${catColor}">${escapeHtml(cat.name)}</span>`
+            : '<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start text-gray-400 bg-gray-100">未分類</span>';
+
+        const pinnedTag = link.pinned
+            ? `<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start font-medium" style="background:${hexToSoft('#8E9775')};color:#8E9775">已釘選</span>`
+            : '';
+
+        const time = link.created_at ? relativeTime(link.created_at) : '';
+
         el.innerHTML = `
             ${imageSection}
             <div class="p-4 flex flex-col gap-2 flex-1">
-                ${cat ? `<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start font-medium" style="background:${hexToSoft(catColor)};color:${catColor}">${escapeHtml(cat.name)}</span>` : '<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start text-gray-400 bg-gray-100">未分類</span>'}
+                <div class="flex flex-wrap gap-1.5">
+                    ${catTag}
+                    ${pinnedTag}
+                </div>
                 <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="font-medium text-sm leading-snug hover:text-[#7e8666] line-clamp-2">${escapeHtml(link.title || link.url)}</a>
                 ${link.description ? `<p class="text-xs text-gray-500 line-clamp-3 leading-relaxed">${escapeHtml(link.description)}</p>` : ''}
                 <div class="flex items-center justify-between mt-auto pt-2 gap-2">
                     <div class="flex items-center gap-1.5 text-[11px] text-gray-400 min-w-0 flex-1">
                         <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32" class="w-3.5 h-3.5 rounded-sm flex-shrink-0" onerror="this.style.display='none'">
-                        <span class="truncate">${escapeHtml(host)}</span>
+                        <span class="truncate">${time ? escapeHtml(time) + ' · ' : ''}${escapeHtml(host)}</span>
                     </div>
                     <div class="flex items-center gap-1 flex-shrink-0">
+                        <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="pin">${link.pinned ? '取消釘選' : '釘選'}</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="edit">編輯</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="recat">分類</button>
                         <button class="btn-ghost text-xs text-red-400 hover:text-red-600" style="padding:0.25rem 0.5rem" data-action="delete">刪除</button>
@@ -469,6 +593,7 @@
                 </div>
             </div>
         `;
+        el.querySelector('[data-action="pin"]').addEventListener('click', () => togglePin(link));
         el.querySelector('[data-action="edit"]').addEventListener('click', () => openEditLinkModal(link));
         el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteLink(link));
         el.querySelector('[data-action="recat"]').addEventListener('click', () => openRecatModal(link));
@@ -499,23 +624,75 @@
         clearTimeout(t._timer);
         t._timer = setTimeout(() => t.classList.remove('show'), 2600);
     }
+    function relativeTime(dateStr) {
+        const now = Date.now();
+        const then = new Date(dateStr).getTime();
+        const diff = now - then;
+        const mins = Math.floor(diff / 60000);
+        const hrs = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        if (mins < 60) return '剛剛';
+        if (hrs < 24) return hrs + ' 小時前';
+        if (days < 3) return days + ' 天前';
+        const d = new Date(dateStr);
+        return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0');
+    }
 
     // ================================================================
     //  Modals
     // ================================================================
     function closeModal() {
         document.getElementById('modals').innerHTML = '';
+        if (_modalCloseCallback) {
+            const cb = _modalCloseCallback;
+            _modalCloseCallback = null;
+            cb();
+        }
     }
     function mountModal(html) {
         document.getElementById('modals').innerHTML =
-            `<div class="modal-backdrop" id="backdrop"><div class="modal" id="modal-content">${html}</div></div>`;
+            `<div class="modal-backdrop" id="backdrop"><div class="modal" id="modal-content" role="dialog" aria-modal="true">${html}</div></div>`;
         document.getElementById('backdrop').addEventListener('click', (e) => {
             if (e.target.id === 'backdrop') closeModal();
         });
+        // Focus trap
+        const modal = document.getElementById('modal-content');
+        setTimeout(() => {
+            const focusable = [...modal.querySelectorAll('button, input, select, textarea')].filter(el => el.offsetParent !== null && !el.disabled);
+            if (focusable.length) focusable[0].focus();
+            modal.addEventListener('keydown', (e) => {
+                if (e.key !== 'Tab') return;
+                const visible = [...modal.querySelectorAll('button, input, select, textarea')].filter(el => el.offsetParent !== null && !el.disabled);
+                if (!visible.length) return;
+                const first = visible[0], last = visible[visible.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            });
+        }, 50);
     }
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
     });
+
+    function confirmModal(message) {
+        return new Promise(resolve => {
+            _modalCloseCallback = () => resolve(false);
+            mountModal(`
+                <h3 class="font-serif text-lg font-bold mb-3">確認</h3>
+                <p class="text-sm text-gray-600 mb-5 leading-relaxed whitespace-pre-line">${escapeHtml(message)}</p>
+                <div class="flex justify-end gap-2">
+                    <button id="cf-no" class="btn-ghost">取消</button>
+                    <button id="cf-yes" class="btn-primary" style="background:var(--color-rose)">確定</button>
+                </div>
+            `);
+            document.getElementById('cf-no').addEventListener('click', () => {
+                _modalCloseCallback = null; closeModal(); resolve(false);
+            });
+            document.getElementById('cf-yes').addEventListener('click', () => {
+                _modalCloseCallback = null; closeModal(); resolve(true);
+            });
+        });
+    }
     function openAddLinkModal() {
         const catOptions = state.categories.map(c =>
             `<option value="${c.id}">${escapeHtml(c.name)}</option>`
@@ -589,6 +766,8 @@
     async function saveNewLink() {
         const url = document.getElementById('l-url').value.trim();
         if (!url) return toast('請輸入網址');
+
+        // Capture form data before potential confirm modal replaces the DOM
         const row = {
             user_id: state.session.user.id,
             url,
@@ -598,9 +777,17 @@
             category_id: document.getElementById('l-cat').value || null,
             site_name: safeHost(url),
         };
+
+        // Duplicate check
+        const { data: existing } = await sbREST(`links?url=eq.${encodeURIComponent(url)}&select=id&limit=1`);
+        if (existing && existing.length > 0) {
+            const yes = await confirmModal('這個網址已經存過了，確定要再存一次嗎？');
+            if (!yes) return;
+        }
+
         const btn = document.getElementById('l-save');
-        btn.disabled = true;
-        btn.textContent = '儲存中…';
+        if (btn) { btn.disabled = true; btn.textContent = '儲存中…'; }
+
         const { error } = await sbREST('links', {
             method: 'POST',
             headers: { Prefer: 'return=minimal' },
@@ -608,13 +795,11 @@
         });
         if (error) {
             toast('儲存失敗：' + error.message);
-            btn.disabled = false;
-            btn.textContent = '儲存';
+            if (btn) { btn.disabled = false; btn.textContent = '儲存'; }
             return;
         }
         closeModal();
-        await loadLinks();
-        renderLinks();
+        await refreshLinks();
         toast('已新增');
     }
 
@@ -707,21 +892,19 @@
             if (error) return toast('失敗：' + error.message);
             closeModal();
             await loadCategories();
-            await loadLinks();
             renderCategories();
-            renderLinks();
+            await refreshLinks();
             toast('已更新分類');
         });
         document.getElementById('ec-delete').addEventListener('click', async () => {
-            if (!confirm(`確定刪除分類「${cat.name}」嗎？\n\n這個分類底下的連結不會被刪除，會變成「未分類」。`)) return;
+            const yes = await confirmModal(`確定刪除分類「${cat.name}」嗎？\n\n這個分類底下的連結不會被刪除，會變成「未分類」。`);
+            if (!yes) return;
             const { error } = await sbREST(`categories?id=eq.${cat.id}`, { method: 'DELETE' });
             if (error) return toast('刪除失敗：' + error.message);
             state.filterCategoryId = null;
-            closeModal();
             await loadCategories();
-            await loadLinks();
             renderCategories();
-            renderLinks();
+            await refreshLinks();
             toast('已刪除分類');
         });
         document.getElementById('ec-name').addEventListener('keydown', (e) => {
@@ -755,8 +938,7 @@
                 });
                 if (error) return toast('失敗：' + error.message);
                 closeModal();
-                await loadLinks();
-                renderLinks();
+                await refreshLinks();
                 toast('已更新');
             });
         });
@@ -809,20 +991,89 @@
                 return;
             }
             closeModal();
-            await loadLinks();
-            renderLinks();
+            await refreshLinks();
             toast('已更新');
         });
     }
 
+    async function togglePin(link) {
+        const newPinned = !link.pinned;
+        if (newPinned) {
+            const catFilter = link.category_id
+                ? `category_id=eq.${link.category_id}`
+                : 'category_id=is.null';
+            const { data } = await sbREST(`links?select=id&${catFilter}&pinned=eq.true`);
+            if (data && data.length >= 3) {
+                return toast('此分類最多釘選 3 個連結');
+            }
+        }
+        const { error } = await sbREST(`links?id=eq.${link.id}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ pinned: newPinned }),
+        });
+        if (error) return toast('操作失敗：' + error.message);
+        toast(newPinned ? '已釘選' : '已取消釘選');
+        await refreshLinks();
+    }
+
     async function deleteLink(link) {
-        if (!confirm('確定刪除這個連結嗎？')) return;
+        const yes = await confirmModal('確定刪除這個連結嗎？');
+        if (!yes) return;
         const { error } = await sbREST(`links?id=eq.${link.id}`, { method: 'DELETE' });
         if (error) return toast('刪除失敗：' + error.message);
-        await loadLinks();
-        renderLinks();
+        await refreshLinks();
         toast('已刪除');
     }
+
+    // ================================================================
+    //  Top-right buttons
+    // ================================================================
+    // ================================================================
+    //  Search handler
+    // ================================================================
+    let _searchTimer;
+    document.getElementById('search-input').addEventListener('input', () => {
+        clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(() => {
+            state.searchQuery = document.getElementById('search-input').value.trim();
+            resetAndLoadLinks();
+        }, 300);
+    });
+
+    // ================================================================
+    //  Sort handler
+    // ================================================================
+    document.getElementById('btn-sort').addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('sort-menu').classList.toggle('hidden');
+    });
+    document.querySelectorAll('#sort-menu [data-sort]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            state.sortKey = btn.dataset.sort;
+            document.getElementById('sort-label').textContent = SORT_LABELS[state.sortKey];
+            document.getElementById('sort-menu').classList.add('hidden');
+            document.querySelectorAll('#sort-menu [data-sort]').forEach(b => {
+                b.classList.toggle('font-semibold', b.dataset.sort === state.sortKey);
+            });
+            resetAndLoadLinks();
+        });
+    });
+
+    // ================================================================
+    //  Infinite scroll
+    // ================================================================
+    let _scrollTimer;
+    window.addEventListener('scroll', () => {
+        clearTimeout(_scrollTimer);
+        _scrollTimer = setTimeout(() => {
+            if (state.loading || !state.hasMore) return;
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            if (scrollHeight - scrollTop - clientHeight < 400) {
+                loadMoreLinks();
+            }
+        }, 150);
+    });
 
     // ================================================================
     //  Top-right buttons
@@ -834,6 +1085,7 @@
     });
     document.addEventListener('click', () => {
         document.getElementById('menu').classList.add('hidden');
+        document.getElementById('sort-menu').classList.add('hidden');
     });
     document.getElementById('btn-signout').addEventListener('click', async () => {
         await sb.auth.signOut();
