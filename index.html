@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>連結收藏看板</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://iwwqavbnaejdewonejll.supabase.co">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -159,6 +163,20 @@
         .color-swatch.selected {
             box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-sage);
         }
+        .masonry {
+            column-count: 3;
+            column-gap: 1.25rem;
+        }
+        .masonry > * {
+            break-inside: avoid;
+            margin-bottom: 1.25rem;
+        }
+        @media (max-width: 1023px) {
+            .masonry { column-count: 2; }
+        }
+        @media (max-width: 639px) {
+            .masonry { column-count: 1; }
+        }
     </style>
 </head>
 <body>
@@ -207,7 +225,7 @@
         </header>
 
         <main class="max-w-6xl mx-auto px-5 sm:px-6 py-8">
-            <div id="links-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+            <div id="links-grid" class="masonry"></div>
             <div id="empty" class="hidden text-center py-24">
                 <div class="text-5xl mb-4 opacity-30">📎</div>
                 <p class="text-gray-400 text-sm">這裡還沒有收藏<br class="sm:hidden">，點右上「＋ 新連結」來加第一筆</p>
@@ -423,21 +441,17 @@
         const cat = state.categories.find(c => c.id === link.category_id);
         const host = safeHost(link.url);
         const catColor = cat ? cat.color : '#A98467';
-        const fallbackLetter = escapeHtml((link.title || host || '?').trim()[0] || '?');
         const el = document.createElement('article');
         el.className = 'card-soft card-link overflow-hidden flex flex-col';
 
-        const thumbHtml = link.thumbnail_url
-            ? `<img src="${escapeHtml(link.thumbnail_url)}" class="w-full h-full object-cover" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+        const imageSection = link.thumbnail_url
+            ? `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="block overflow-hidden" style="max-height:360px">
+                   <img src="${escapeHtml(link.thumbnail_url)}" class="w-full block" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.remove()">
+               </a>`
             : '';
 
         el.innerHTML = `
-            <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="block">
-                <div class="aspect-[16/9] flex items-center justify-center overflow-hidden" style="background:${hexToSoft(catColor)}">
-                    ${thumbHtml}
-                    <span class="text-4xl font-serif pointer-events-none" style="color:${catColor};${link.thumbnail_url ? 'display:none' : ''}">${fallbackLetter}</span>
-                </div>
-            </a>
+            ${imageSection}
             <div class="p-4 flex flex-col gap-2 flex-1">
                 ${cat ? `<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start font-medium" style="background:${hexToSoft(catColor)};color:${catColor}">${escapeHtml(cat.name)}</span>` : '<span class="inline-block text-[11px] px-2 py-0.5 rounded-full self-start text-gray-400 bg-gray-100">未分類</span>'}
                 <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener" class="font-medium text-sm leading-snug hover:text-[#7e8666] line-clamp-2">${escapeHtml(link.title || link.url)}</a>
@@ -448,12 +462,14 @@
                         <span class="truncate">${escapeHtml(host)}</span>
                     </div>
                     <div class="flex items-center gap-1 flex-shrink-0">
+                        <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="edit">編輯</button>
                         <button class="btn-ghost text-xs" style="padding:0.25rem 0.5rem" data-action="recat">分類</button>
                         <button class="btn-ghost text-xs text-red-400 hover:text-red-600" style="padding:0.25rem 0.5rem" data-action="delete">刪除</button>
                     </div>
                 </div>
             </div>
         `;
+        el.querySelector('[data-action="edit"]').addEventListener('click', () => openEditLinkModal(link));
         el.querySelector('[data-action="delete"]').addEventListener('click', () => deleteLink(link));
         el.querySelector('[data-action="recat"]').addEventListener('click', () => openRecatModal(link));
         return el;
@@ -500,8 +516,6 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
     });
-    window.closeModal = closeModal;
-
     function openAddLinkModal() {
         const catOptions = state.categories.map(c =>
             `<option value="${c.id}">${escapeHtml(c.name)}</option>`
@@ -528,10 +542,11 @@
                 </select>
             </div>
             <div class="flex justify-end gap-2">
-                <button class="btn-ghost" onclick="closeModal()">取消</button>
+                <button id="l-cancel" class="btn-ghost">取消</button>
                 <button id="l-save" class="btn-primary hidden">儲存</button>
             </div>
         `);
+        document.getElementById('l-cancel').addEventListener('click', closeModal);
         document.getElementById('l-fetch').addEventListener('click', fetchAndPreview);
         document.getElementById('l-url').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault(); fetchAndPreview(); }
@@ -560,12 +575,12 @@
             document.getElementById('l-title').value = d.title || '';
             document.getElementById('l-desc').value = d.description || '';
             let thumb = d.image && d.image.url ? d.image.url : '';
-            if (!thumb) {
-                thumb = 'https://s.wordpress.com/mshots/v1/' + encodeURIComponent(url) + '?w=1200';
-            }
             document.getElementById('l-thumb').value = thumb;
-            img.innerHTML = `<img src="${escapeHtml(thumb)}" class="w-full h-full object-cover" referrerpolicy="no-referrer"
-                onerror="this.src='https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200'">`;
+            if (thumb) {
+                img.innerHTML = `<img src="${escapeHtml(thumb)}" class="w-full h-full object-cover" referrerpolicy="no-referrer" onerror="this.remove()">`;
+            } else {
+                img.innerHTML = '<span class="text-xs text-gray-500 px-4 text-center">此連結沒有圖片，可稍後手動補上</span>';
+            }
         } catch (err) {
             img.innerHTML = '<span class="text-xs text-gray-500 px-4 text-center">抓不到預覽，請手動填標題／描述／縮圖</span>';
         }
@@ -614,10 +629,11 @@
             <label class="block text-[11px] text-gray-500 mb-2 tracking-[0.1em] uppercase">顏色</label>
             <div id="c-colors" class="flex gap-2 mb-6 flex-wrap">${swatches}</div>
             <div class="flex justify-end gap-2">
-                <button class="btn-ghost" onclick="closeModal()">取消</button>
+                <button id="c-cancel" class="btn-ghost">取消</button>
                 <button id="c-save" class="btn-primary">新增</button>
             </div>
         `);
+        document.getElementById('c-cancel').addEventListener('click', closeModal);
         let selected = COLOR_PALETTE[0];
         document.querySelectorAll('#c-colors .color-swatch').forEach((b) => {
             b.addEventListener('click', () => {
@@ -665,11 +681,12 @@
             <div class="flex justify-between items-center gap-2">
                 <button id="ec-delete" class="btn-ghost text-red-500 hover:bg-red-50">刪除分類</button>
                 <div class="flex gap-2">
-                    <button class="btn-ghost" onclick="closeModal()">取消</button>
+                    <button id="ec-cancel" class="btn-ghost">取消</button>
                     <button id="ec-save" class="btn-primary">儲存</button>
                 </div>
             </div>
         `);
+        document.getElementById('ec-cancel').addEventListener('click', closeModal);
         let selected = cat.color;
         document.querySelectorAll('#ec-colors .color-swatch').forEach((b) => {
             b.addEventListener('click', () => {
@@ -723,9 +740,10 @@
                 ${opts}
             </div>
             <div class="flex justify-end">
-                <button class="btn-ghost" onclick="closeModal()">取消</button>
+                <button id="rc-cancel" class="btn-ghost">取消</button>
             </div>
         `);
+        document.getElementById('rc-cancel').addEventListener('click', closeModal);
         document.querySelectorAll('#modal-content [data-id]').forEach((b) => {
             b.addEventListener('click', async () => {
                 const raw = b.dataset.id;
@@ -741,6 +759,59 @@
                 renderLinks();
                 toast('已更新');
             });
+        });
+    }
+
+    function openEditLinkModal(link) {
+        const catOptions = state.categories.map(c =>
+            `<option value="${c.id}" ${c.id === link.category_id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+        ).join('');
+        mountModal(`
+            <h3 class="font-serif text-lg font-bold mb-4">編輯連結</h3>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">網址</label>
+            <div class="text-xs text-gray-400 mb-4 break-all">${escapeHtml(link.url)}</div>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">標題</label>
+            <input id="el-title" class="input mb-3" value="${escapeHtml(link.title || '')}">
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">描述</label>
+            <textarea id="el-desc" class="input mb-3" rows="2" style="resize:vertical">${escapeHtml(link.description || '')}</textarea>
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">縮圖網址</label>
+            <input id="el-thumb" class="input mb-3" value="${escapeHtml(link.thumbnail_url || '')}" placeholder="https://...">
+            <label class="block text-[11px] text-gray-500 mb-1.5 tracking-[0.1em] uppercase">分類</label>
+            <select id="el-cat" class="input mb-5">
+                <option value="">（未分類）</option>
+                ${catOptions}
+            </select>
+            <div class="flex justify-end gap-2">
+                <button id="el-cancel" class="btn-ghost">取消</button>
+                <button id="el-save" class="btn-primary">儲存</button>
+            </div>
+        `);
+        document.getElementById('el-cancel').addEventListener('click', closeModal);
+        document.getElementById('el-save').addEventListener('click', async () => {
+            const updates = {
+                title: document.getElementById('el-title').value.trim() || null,
+                description: document.getElementById('el-desc').value.trim() || null,
+                thumbnail_url: document.getElementById('el-thumb').value.trim() || null,
+                category_id: document.getElementById('el-cat').value || null,
+            };
+            const btn = document.getElementById('el-save');
+            btn.disabled = true;
+            btn.textContent = '儲存中…';
+            const { error } = await sbREST(`links?id=eq.${link.id}`, {
+                method: 'PATCH',
+                headers: { Prefer: 'return=minimal' },
+                body: JSON.stringify(updates),
+            });
+            if (error) {
+                toast('儲存失敗：' + error.message);
+                btn.disabled = false;
+                btn.textContent = '儲存';
+                return;
+            }
+            closeModal();
+            await loadLinks();
+            renderLinks();
+            toast('已更新');
         });
     }
 
