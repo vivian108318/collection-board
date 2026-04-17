@@ -471,7 +471,9 @@
         path += '&order=' + order;
 
         // Category filter
-        if (state.filterCategoryId) {
+        if (state.filterCategoryId === '__none__') {
+            path += '&category_id=is.null';
+        } else if (state.filterCategoryId) {
             path += '&category_id=eq.' + state.filterCategoryId;
         }
 
@@ -534,6 +536,8 @@
         for (const cat of state.categories) {
             bar.appendChild(chipEl(cat.name, cat.id, state.filterCategoryId === cat.id, cat.color, counts[cat.id] || 0));
         }
+        const noneCount = counts['__none__'] || 0;
+        bar.appendChild(chipEl('未分類', '__none__', state.filterCategoryId === '__none__', '#999999', noneCount));
         const addBtn = document.createElement('button');
         addBtn.className = 'cat-chip text-gray-400';
         addBtn.style.borderStyle = 'dashed';
