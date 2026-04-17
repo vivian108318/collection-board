@@ -710,7 +710,7 @@
     function mountModal(html) {
         document.getElementById('modals').innerHTML =
             `<div class="modal-backdrop" id="backdrop"><div class="modal" id="modal-content" role="dialog" aria-modal="true">${html}</div></div>`;
-        document.getElementById('backdrop').addEventListener('click', (e) => {
+        document.getElementById('backdrop').addEventListener('mousedown', (e) => {
             if (e.target.id === 'backdrop') closeModal();
         });
         // Focus trap
